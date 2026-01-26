@@ -1,14 +1,15 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
-  local lazyrepo = "https://github.com/folke/lazy.nvim.git"
-  local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath })
-  if vim.v.shell_error ~= 0 then
-    vim.api.nvim_echo({ { "Failed to clone lazy.nvim:\n", "ErrorMsg" },
-      { out, "WarningMsg" },
-      { "\nPress any key to exit..." },
-    }, true, {})
-    vim.fn.getchar() os.exit(1)
-  end
+    local lazyrepo = "https://github.com/folke/lazy.nvim.git"
+    local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath })
+    if vim.v.shell_error ~= 0 then
+        vim.api.nvim_echo({ { "Failed to clone lazy.nvim:\n", "ErrorMsg" },
+            { out,                            "WarningMsg" },
+            { "\nPress any key to exit..." },
+        }, true, {})
+        vim.fn.getchar()
+        os.exit(1)
+    end
 end
 vim.opt.rtp:prepend(lazypath)
 
@@ -34,7 +35,7 @@ local plugins = {
         },
         config = function()
             local builtin = require("telescope.builtin")
-            vim.keymap.set('n', '<leader>ff', builtin.find_files, {desc = 'Telescope find files'})
+            vim.keymap.set('n', '<leader>ff', builtin.find_files, { desc = 'Telescope find files' })
             vim.keymap.set('n', '<leader>fg', builtin.live_grep, { desc = 'Telescope live grep' })
         end,
     },
@@ -43,7 +44,7 @@ local plugins = {
         build = ':TSUpdate',
         config = function()
             require("nvim-treesitter.configs").setup({
-                ensure_installed = {"lua", "cpp", "c", "java", "rust", "python", "bash"},
+                ensure_installed = { "lua", "cpp", "c", "java", "rust", "python", "bash" },
                 highlight = { enable = true },
                 indent = { enable = true },
             })
@@ -57,11 +58,141 @@ local plugins = {
             "MunifTanjim/nui.nvim",
             "nvim-tree/nvim-web-devicons",
         },
-        lazy = false, 
+        lazy = false,
+        config = function()
+            require("neo-tree").setup({
+                filesystem = {
+                    filtered_items = {
+                        visible = false,      -- Hidden files not visible by default
+                        hide_dotfiles = true, -- Hide dotfiles by default
+                        hide_gitignored = false,
+                    },
+                },
+                window = {
+                    mappings = {
+                        ["H"] = "toggle_hidden",
+                    },
+                },
+            })
+        end,
     },
     {
         "mason-org/mason.nvim",
         opts = {}
+    },
+    {
+        "williamboman/mason-lspconfig.nvim",
+        dependencies = { "mason-org/mason.nvim" },
+        opts = {
+            ensure_installed = { "clangd" },
+        }
+    },
+    {
+        "hrsh7th/nvim-cmp",
+        event = "InsertEnter",
+        dependencies = {
+            "hrsh7th/cmp-nvim-lsp",
+            "hrsh7th/cmp-buffer",
+            "hrsh7th/cmp-path",
+            "L3MON4D3/LuaSnip",
+            "saadparwaiz1/cmp_luasnip",
+        },
+        config = function()
+            local cmp = require("cmp")
+            local luasnip = require("luasnip")
+
+            cmp.setup({
+                snippet = {
+                    expand = function(args)
+                        luasnip.lsp_expand(args.body)
+                    end,
+                },
+                mapping = cmp.mapping.preset.insert({
+                    ['<C-Space>'] = cmp.mapping.complete(),
+                    ['<C-e>'] = cmp.mapping.abort(),
+                    ['<CR>'] = cmp.mapping.confirm({ select = true }),
+                    ['<Tab>'] = cmp.mapping(function(fallback)
+                        if cmp.visible() then
+                            cmp.select_next_item()
+                        elseif luasnip.expand_or_jumpable() then
+                            luasnip.expand_or_jump()
+                        else
+                            fallback()
+                        end
+                    end, { 'i', 's' }),
+                    ['<S-Tab>'] = cmp.mapping(function(fallback)
+                        if cmp.visible() then
+                            cmp.select_prev_item()
+                        elseif luasnip.jumpable(-1) then
+                            luasnip.jump(-1)
+                        else
+                            fallback()
+                        end
+                    end, { 'i', 's' }),
+                }),
+                sources = cmp.config.sources({
+                    { name = 'nvim_lsp' },
+                    { name = 'luasnip' },
+                    { name = 'buffer' },
+                    { name = 'path' },
+                }),
+            })
+        end,
+    },
+    {
+        "neovim/nvim-lspconfig",
+        dependencies = {
+            "mason-org/mason.nvim",
+            "williamboman/mason-lspconfig.nvim",
+            "hrsh7th/cmp-nvim-lsp",
+        },
+        config = function()
+            local capabilities = require('cmp_nvim_lsp').default_capabilities()
+            vim.lsp.config('*', {
+                cmd = {
+                    "clangd",
+                    "--background-index",
+                    "--clang-tidy",
+                    "--header-insertion=iwyu",
+                    "--completion-style=detailed",
+                    "--function-arg-placeholders",
+                },
+                filetypes = { "c", "cpp", "objc", "objcpp", "cuda" },
+                root_markers = { ".clangd", ".clang-tidy", ".clang-format", "compile_commands.json", "compile_flags.txt", ".git" },
+                capabilities = capabilities,
+            })
+
+            vim.lsp.enable('clangd')
+            vim.keymap.set('n', 'gd', vim.lsp.buf.definition, { desc = 'Go to definition' })
+            vim.keymap.set('n', 'K', vim.lsp.buf.hover, { desc = 'Hover documentation' })
+            vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, { desc = 'Go to implementation' })
+            vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { desc = 'Rename symbol' })
+            vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, { desc = 'Code action' })
+            vim.keymap.set('n', 'gr', vim.lsp.buf.references, { desc = 'Find references' })
+        end,
+    },
+    {
+        "stevearc/conform.nvim",
+        event = { "BufWritePre" },
+        cmd = { "ConformInfo" },
+        opts = {
+            formatters_by_ft = {
+                cpp = { "clang_format" },
+                c = { "clang_format" },
+            },
+            format_on_save = {
+                timeout_ms = 500,
+                lsp_fallback = true,
+            },
+        },
+        config = function(_, opts)
+            require("conform").setup(opts)
+
+            -- Manual clang format
+            vim.keymap.set('n', '<leader>fm', function()
+                require("conform").format({ async = true, lsp_fallback = true })
+            end, { desc = 'Format buffer' })
+        end,
     },
     {
         'jeffkreeftmeijer/vim-numbertoggle',
@@ -125,44 +256,44 @@ local plugins = {
 local opts = {}
 require("lazy").setup(plugins, opts)
 
--- Line numbers configs 
-vim.opt.number = true           
-vim.opt.relativenumber = true   
-vim.opt.cursorline = true       
-vim.opt.cursorlineopt = 'number' 
+-- Line numbers configs
+vim.opt.number = true
+vim.opt.relativenumber = true
+vim.opt.cursorline = true
+vim.opt.cursorlineopt = 'number'
 
 -- Toggle line number modes with <leader>tn
 vim.keymap.set('n', '<leader>tn', function()
-  if vim.wo.relativenumber then
-    vim.wo.relativenumber = false
-    vim.wo.number = true
-    print("Line numbers: absolute only")
-  elseif vim.wo.number then
-    vim.wo.relativenumber = false
-    vim.wo.number = false
-    print("Line numbers: off")
-  else
-    vim.wo.relativenumber = true
-    vim.wo.number = true
-    print("Line numbers: hybrid (relative + absolute)")
-  end
+    if vim.wo.relativenumber then
+        vim.wo.relativenumber = false
+        vim.wo.number = true
+        print("Line numbers: absolute only")
+    elseif vim.wo.number then
+        vim.wo.relativenumber = false
+        vim.wo.number = false
+        print("Line numbers: off")
+    else
+        vim.wo.relativenumber = true
+        vim.wo.number = true
+        print("Line numbers: hybrid (relative + absolute)")
+    end
 end, { desc = 'Toggle line number modes' })
 
 -- Some neotree keymaps
 vim.keymap.set('n', '<C-n>', ':Neotree toggle left<CR>', { desc = 'Toggle Neotree' })
 vim.keymap.set('n', '<C-e>', function()
-  local current_win = vim.api.nvim_get_current_win()
-  local current_buf = vim.api.nvim_win_get_buf(current_win)
-  local buf_ft = vim.api.nvim_get_option_value('filetype', { buf = current_buf })
+    local current_win = vim.api.nvim_get_current_win()
+    local current_buf = vim.api.nvim_win_get_buf(current_win)
+    local buf_ft = vim.api.nvim_get_option_value('filetype', { buf = current_buf })
 
-  if buf_ft == 'neo-tree' then
-    vim.cmd('wincmd p')
-  else
-    vim.cmd('Neotree focus')
-  end
+    if buf_ft == 'neo-tree' then
+        vim.cmd('wincmd p')
+    else
+        vim.cmd('Neotree focus')
+    end
 end, { desc = 'Toggle focus between Neotree and file' })
 vim.keymap.set('n', '<C-g>', ':Neotree float git_status<CR>', { desc = 'Show git status' })
--- neotree keymaps    
+-- neotree keymaps
 
 -- code snippets directory
 local template_dir = vim.fn.stdpath("config") .. "/templates/"
@@ -177,7 +308,8 @@ local function insert_template(template_file)
 end
 
 -- keymaps for different code snippets
-vim.keymap.set('n', '<leader>cp', function() insert_template('cp_template.cpp') end, { desc = 'Insert competitive programming template' })
+vim.keymap.set('n', '<leader>cp', function() insert_template('cp_template.cpp') end,
+    { desc = 'Insert competitive programming template' })
 
 -- Terminal keymaps using toggleterm
 vim.keymap.set('n', '<leader>tt', ':ToggleTerm direction=horizontal<CR>', { desc = 'Toggle terminal at bottom' })
@@ -197,6 +329,5 @@ end, { desc = 'Compile cpp file' })
 vim.keymap.set('n', '<C-r>', function()
     local file = vim.fn.expand('%')
     local output = vim.fn.expand('%:r')
-    vim.cmd('split | terminal g++ -std=c++23 -Wall -o '  .. output .. ' ' .. file .. ' && ./' .. output)
+    vim.cmd('split | terminal g++ -std=c++23 -Wall -o ' .. output .. ' ' .. file .. ' && ./' .. output)
 end, { desc = 'Compile and run cpp file' })
-
