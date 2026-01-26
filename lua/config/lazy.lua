@@ -80,6 +80,46 @@ local plugins = {
             vim.keymap.set('n', '<leader>gw', ':Gwrite<CR>', { desc = 'Git add current file' })
             vim.keymap.set('n', '<leader>gr', ':Gread<CR>', { desc = 'Git checkout current file' })
         end,
+    },
+    {
+        'akinsho/bufferline.nvim',
+        version = "*",
+        dependencies = 'nvim-tree/nvim-web-devicons',
+        config = function()
+            require("bufferline").setup({
+                options = {
+                    mode = "buffers",
+                    offsets = {
+                        {
+                            filetype = "neo-tree",
+                            text = "File Explorer",
+                            highlight = "Directory",
+                            separator = true
+                        }
+                    },
+                }
+            })
+            -- Keymaps for buffer navigation
+            vim.keymap.set('n', '<Tab>', ':BufferLineCycleNext<CR>', { desc = 'Next buffer', silent = true })
+            vim.keymap.set('n', '<S-Tab>', ':BufferLineCyclePrev<CR>', { desc = 'Previous buffer', silent = true })
+            vim.keymap.set('n', '<leader>bd', ':bdelete<CR>', { desc = 'Close buffer', silent = true })
+            vim.keymap.set('n', '<leader>bp', ':BufferLinePick<CR>', { desc = 'Pick buffer', silent = true })
+        end,
+    },
+    {
+        'akinsho/toggleterm.nvim',
+        version = "*",
+        config = function()
+            require("toggleterm").setup({
+                size = 15,
+                open_mapping = [[<C-\>]],
+                direction = 'horizontal',
+                shade_terminals = true,
+                start_in_insert = true,
+                persist_size = true,
+                close_on_exit = true,
+            })
+        end,
     }
 }
 local opts = {}
@@ -123,3 +163,40 @@ vim.keymap.set('n', '<C-e>', function()
 end, { desc = 'Toggle focus between Neotree and file' })
 vim.keymap.set('n', '<C-g>', ':Neotree float git_status<CR>', { desc = 'Show git status' })
 -- neotree keymaps    
+
+-- code snippets directory
+local template_dir = vim.fn.stdpath("config") .. "/templates/"
+local function insert_template(template_file)
+    local file_path = template_dir .. template_file
+    if vim.fn.filereadable(file_path) == 1 then
+        vim.cmd("0read " .. file_path)
+        vim.cmd("normal! Gdd")
+    else
+        print("Template not found: " .. file_path)
+    end
+end
+
+-- keymaps for different code snippets
+vim.keymap.set('n', '<leader>cp', function() insert_template('cp_template.cpp') end, { desc = 'Insert competitive programming template' })
+
+-- Terminal keymaps using toggleterm
+vim.keymap.set('n', '<leader>tt', ':ToggleTerm direction=horizontal<CR>', { desc = 'Toggle terminal at bottom' })
+vim.keymap.set('n', '<leader>tf', ':ToggleTerm direction=float<CR>', { desc = 'Toggle floating terminal' })
+vim.keymap.set('n', '<leader>tv', ':ToggleTerm direction=vertical<CR>', { desc = 'Toggle vertical terminal' })
+vim.keymap.set('t', '<Esc>', [[<C-\><C-n>]], { desc = 'Exit terminal mode' })
+vim.keymap.set('t', '<C-\\>', [[<C-\><C-n>:ToggleTerm<CR>]], { desc = 'Close terminal' })
+
+-- C++ build commands
+vim.keymap.set('n', '<C-b>', function()
+    local file = vim.fn.expand('%')
+    local output = vim.fn.expand('%:r')
+    vim.cmd('split | terminal g++ -std=c++23 -Wall -o ' .. output .. ' ' .. file)
+end, { desc = 'Compile cpp file' })
+
+-- Compile and run cpp program
+vim.keymap.set('n', '<C-r>', function()
+    local file = vim.fn.expand('%')
+    local output = vim.fn.expand('%:r')
+    vim.cmd('split | terminal g++ -std=c++23 -Wall -o '  .. output .. ' ' .. file .. ' && ./' .. output)
+end, { desc = 'Compile and run cpp file' })
+
