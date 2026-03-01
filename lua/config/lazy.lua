@@ -63,8 +63,8 @@ local plugins = {
             require("neo-tree").setup({
                 filesystem = {
                     filtered_items = {
-                        visible = false,      -- Hidden files not visible by default
-                        hide_dotfiles = true, -- Hide dotfiles by default
+                        visible = false,
+                        hide_dotfiles = true,
                         hide_gitignored = false,
                     },
                 },
@@ -114,7 +114,7 @@ local plugins = {
                     ['<Tab>'] = cmp.mapping(function(fallback)
                         if cmp.visible() then
                             cmp.select_next_item()
-                        elseif luasnip.expand_or_jumpable() then
+                        elseif luasnip.locally_jumpable(1) then
                             luasnip.expand_or_jump()
                         else
                             fallback()
@@ -180,10 +180,11 @@ local plugins = {
                 cpp = { "clang_format" },
                 c = { "clang_format" },
             },
-            format_on_save = {
-                timeout_ms = 500,
-                lsp_fallback = true,
-            },
+            -- format_on_save disabled - use <leader>fm to format manually
+            -- format_on_save = {
+            --     timeout_ms = 500,
+            --     lsp_fallback = true,
+            -- },
         },
         config = function(_, opts)
             require("conform").setup(opts)
@@ -251,8 +252,7 @@ local plugins = {
                 close_on_exit = true,
             })
         end,
-    }
-}
+    }}
 local opts = {}
 require("lazy").setup(plugins, opts)
 
@@ -317,6 +317,32 @@ vim.keymap.set('n', '<leader>tf', ':ToggleTerm direction=float<CR>', { desc = 'T
 vim.keymap.set('n', '<leader>tv', ':ToggleTerm direction=vertical<CR>', { desc = 'Toggle vertical terminal' })
 vim.keymap.set('t', '<Esc>', [[<C-\><C-n>]], { desc = 'Exit terminal mode' })
 vim.keymap.set('t', '<C-\\>', [[<C-\><C-n>:ToggleTerm<CR>]], { desc = 'Close terminal' })
+
+-- Auto-remove empty unnamed buffers when opening a file
+vim.api.nvim_create_autocmd("BufEnter", {
+    callback = function()
+        local bufnr = vim.api.nvim_get_current_buf()
+        local bufname = vim.api.nvim_buf_get_name(bufnr)
+
+        -- If current buffer has a name (is a real file)
+        if bufname ~= "" then
+            -- Find and delete empty unnamed buffers
+            for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+                if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf) then
+                    local name = vim.api.nvim_buf_get_name(buf)
+                    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+                    local is_empty = name == "" and #lines == 1 and lines[1] == ""
+                    local ft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+
+                    -- Delete if empty, unnamed, and not a special buffer
+                    if is_empty and ft == "" and buf ~= bufnr then
+                        vim.api.nvim_buf_delete(buf, { force = true })
+                    end
+                end
+            end
+        end
+    end,
+})
 
 -- C++ build commands
 vim.keymap.set('n', '<C-b>', function()
